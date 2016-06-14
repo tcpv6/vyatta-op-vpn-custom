@@ -100,7 +100,7 @@ sub conv_hash {
 
 sub conv_enc {
   my $enc = pop(@_);
-  if ($enc =~ /(.*?)_.*?_(.*)/){
+  if ($enc =~ /(.*?)_.*_(.*)/){
     $enc = lc($1).$2;
     $enc =~ s/^ //g;
   } elsif ($enc =~ /3DES/) {
@@ -204,6 +204,7 @@ sub process_tunnels{
   my %esp_hash = ();
   foreach my $line (@ipsecstatus) {
     if (($line =~ /\"(peer-.*-tunnel-.*?)\"/)){
+      ## IKEv1
       my $connectid = $1;
       if (($line =~ /\"(peer-.*-tunnel-.*?)\"(\[\d*\])/)){
         $connectid .= $2;
@@ -413,9 +414,15 @@ sub process_tunnels{
         $tunnel_hash{$connectid}->{_natdst} = $natdst;
       }
       elsif ($line =~ /ESP.proposal:(.*?)\/(.*?)\/(.*)/){
-        $tunnel_hash{$connectid}->{_encryption} = $1;
-        $tunnel_hash{$connectid}->{_hash} = $2;
-        $tunnel_hash{$connectid}->{_pfsgrp} = $3;
+        my $encr = $1;
+        my $hash = $2;
+        my $pfsgrp = $3;
+
+        $hash = "gcm" if ($encr =~ /GCM/);
+
+        $tunnel_hash{$connectid}->{_encryption} = $encr;
+        $tunnel_hash{$connectid}->{_hash} = $hash;
+        $tunnel_hash{$connectid}->{_pfsgrp} = $pfsgrp;
       }
       elsif ($line =~ /STATE_MAIN_I1/){
         $tunnel_hash{$connectid}->{_ikestate} = "init";
@@ -502,6 +509,7 @@ sub process_tunnels{
         }
       }
     } elsif ($line =~ /^(peer-.*-tunnel-.*?)[{\[].*:\s+/) {
+      ## IKEv2
       my $connectid = $1;
       $connectid .= $2 if ($line =~ /(peer-.*-tunnel-.*?):(\[\d*\])/);
       $connectid =~ /peer-(.*)-tunnel-(.*)/;
@@ -599,13 +607,21 @@ sub process_tunnels{
         $esp_hash{$connectid}{$1}->{_inspi} = $2;
         $esp_hash{$connectid}{$1}->{_outspi} = $3;
 
-      } elsif ($line =~ /{(\d+)}:\s+(.*?)\/(.*?), (\d+) bytes_i.* (\d+) bytes_o.*rekeying (disabled|in .*)/) {
+      } elsif ($line =~ /{(\d+)}:\s+(.*?)([\/.*?]{0,1}), (\d+) bytes_i.* (\d+) bytes_o.*rekeying (disabled|in .*)/) {
         my $esp_id = $1;
-        $esp_hash{$connectid}{$esp_id}->{_encryption} = $2;
-        $esp_hash{$connectid}{$esp_id}->{_hash} = $3;
-        $esp_hash{$connectid}{$esp_id}->{_inbytes} = $4;
-        $esp_hash{$connectid}{$esp_id}->{_outbytes} = $5;
-        $esp_hash{$connectid}{$esp_id}->{_expire} = conv_time($6);
+        my $encr = $2;
+        my $hash = $3;
+        my $inbytes = $4;
+        my $outbytes = $5;
+        my $expire = conv_time($6);
+
+        $hash = "gcm" if ($encr =~ /GCM/);
+
+        $esp_hash{$connectid}{$esp_id}->{_encryption} = $encr;
+        $esp_hash{$connectid}{$esp_id}->{_hash} = $hash;
+        $esp_hash{$connectid}{$esp_id}->{_inbytes} = $inbytes;
+        $esp_hash{$connectid}{$esp_id}->{_outbytes} = $outbytes;
+        $esp_hash{$connectid}{$esp_id}->{_expire} = $expire;
 
         my $last_used = 1000;
         $last_used = $1 if ($line =~ /\((\d+)s ago\)/);
