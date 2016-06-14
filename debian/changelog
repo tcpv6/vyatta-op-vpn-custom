@@ -1,3 +1,9 @@
+vyatta-op-vpn (0.14.2+vyos1+helium5) unstable; urgency=low
+
+  * Bumping revision number
+
+ -- Jason Hendry <jhendry@gmail.com>  Thu, 14 Jun 2016 12:00:11 +0100
+
 vyatta-op-vpn (0.14.1+vyos1+helium5) unstable; urgency=low
 
   * Fixing UI when using GCM IPSec ciphers
